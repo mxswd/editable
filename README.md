@@ -20,4 +20,4 @@ data Foo = Bar String Int | Baz Int
 instance Editable Foo
 ```
 
-![example](https://pbs.twimg.com/media/Bn0q3K1IYAAZ7xY.jpg)
+![example](https://cloud.githubusercontent.com/assets/136101/3006789/f235419e-de4d-11e3-8a4e-796d5b9ae49c.png)
