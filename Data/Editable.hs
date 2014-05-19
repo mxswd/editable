@@ -24,8 +24,7 @@ edit datatype fieldName pError initialV = do
 
   e <- editWidget
   setEditText e (T.pack (shower initialV))
-  -- A bug in vty doesn't let me move the cursor past this
-  setEditCursorPosition (0, length (shower initialV) - 1) e
+  setEditCursorPosition (0, length (shower initialV)) e
 
   fg <- newFocusGroup
   _ <- addToFocusGroup fg e
