@@ -1,5 +1,5 @@
 name:                editable
-version:             1.0.0.1
+version:             1.0.0.2
 synopsis:            Interactive editors for Generics
 description:         
   Editable can derive editors for data types.
@@ -27,8 +27,14 @@ maintainer:          maxwellswadling@gmail.com
 copyright:           Copyright (C) 2014 Maxwell Swadling
 category:            Data
 build-type:          Simple
+homepage:            https://github.com/maxpow4h/editable
+bug-reports:         https://github.com/maxpow4h/editable/issues
 extra-source-files:  demo.hs
 cabal-version:       >=1.10
+
+source-repository head
+  type:              git
+  location:          git://github.com/maxpow4h/editable.git
 
 library
   ghc-options:         -Wall
