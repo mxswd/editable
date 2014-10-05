@@ -2,65 +2,28 @@
 module Data.Editable (editor, Editable, Parseable(..)) where
 
 import GHC.Generics
-import Control.Applicative
 import Graphics.Vty.Widgets.All
 import qualified Data.Text as T
 import Graphics.Vty hiding (Button)
-import Graphics.Vty.Widgets.All
 import Control.Concurrent
 import Text.Read
-import Data.Maybe
 import Data.Monoid
 import Data.Typeable
-import Data.Proxy
 import Data.IORef
 
-edit :: Parseable a => Maybe String -> Maybe String -> Maybe String -> a -> IO a
-edit datatype fieldName pError initialV = do
-  -- To stop VTY from catching GHCI's first enter keypress
-  threadDelay 1
-
-  isBottom <- newIORef False
-
-  e <- editWidget
-  setEditText e (T.pack (shower initialV))
-  setEditCursorPosition (0, length (shower initialV)) e
-
-  fg <- newFocusGroup
-  _ <- addToFocusGroup fg e
-
-  be <- bordered =<< boxFixed 40 1 e
-
-  c <- centered =<< ((plainText     $"Data type:   " <> maybe "unknown" T.pack datatype)
-                     <--> plainText ("Constructor: " <> maybe "unknown" T.pack fieldName)
-                     <--> plainText ("Field type:  " <> (T.pack (typeName initialV)))
-                     <--> plainText (maybe "" (T.pack . (++) "Parse error: ") pError)
-                     <--> (return be)
-                     <--> plainText "Push ESC to use ⊥."
-                     >>= withBoxSpacing 1 )
-
-  coll <- newCollection
-  _ <- addToCollection coll c fg
-
-
-  fg `onKeyPressed` \_ k _ ->
-    case k of
-      KEsc -> shutdownUi >> writeIORef isBottom True >> return True
-      KEnter -> shutdownUi >> return True
-      _ -> return False
-
-  runUi coll defaultContext
-
-  isb <- readIORef isBottom
-  if isb then return undefined
-    else do
-      res <- T.unpack `fmap` getEditText e
-      case reader res of
-        Right x -> return x
-        Left e -> do
-          edit datatype fieldName (Just $ "Failed to parse: " ++ show res ++ "\n" ++ e) initialV
-
--- Parseable
+-- | A type is parseable if you can:
+--
+-- * From a string return either a value or an error message.
+--
+-- * Represent a value as a string.
+--
+-- * Showing a value then reading it yields the same value.
+--
+-- * The type can be pretty printed.
+--
+-- With overlapping instances, you get this instance for free for any
+-- type that is in 'Show', 'Read' and 'Typeable'. The 'String' instance is also
+-- provided so quotes are not required.
 class Parseable a where
   reader :: String -> Either String a
   shower :: a -> String
@@ -79,8 +42,14 @@ instance (Show a, Read a, Typeable a) => Parseable a where
       proxy :: a -> Proxy a
       proxy _ = Proxy
 
--- Editable
+-- | Launch an editor for a value with @editor@.
+-- Editable can be derived with @instance Editable a@ so long as:
+--
+-- * @a@ instances 'Generic' (i.e. have @deriving Generics@ on the type).
+--
+-- * All the constructors' fields' types are 'Parseable'.
 class Editable a where
+  -- | Launch an interactive editor for a value.
   editor :: a -> IO a
 
   default editor :: (Generic a, GEditable (Rep a)) => a -> IO a
@@ -113,5 +82,51 @@ instance (GEditable b, GEditable c) => GEditable (b :+: c) where
 
 instance GEditable U1 where
   geditor _ _ U1 = do
-    putStrLn "Editing () yields ()"
+    putStrLn "Editing () yields ()" -- not so true, can't pick ⊥
     return U1
+
+-- the vty editor
+
+edit :: Parseable a => Maybe String -> Maybe String -> Maybe String -> a -> IO a
+edit datatype fieldName pError initialV = do
+  -- To stop VTY from catching GHCI's first enter keypress
+  threadDelay 1
+
+  isBottom <- newIORef False
+
+  e <- editWidget
+  setEditText e (T.pack (shower initialV))
+  setEditCursorPosition (0, length (shower initialV)) e
+
+  fg <- newFocusGroup
+  _ <- addToFocusGroup fg e
+
+  be <- bordered =<< boxFixed 40 1 e
+
+  c <- centered =<< ((plainText     $"Data type:   " <> maybe "unknown" T.pack datatype)
+                     <--> plainText ("Constructor: " <> maybe "unknown" T.pack fieldName)
+                     <--> plainText ("Field type:  " <> (T.pack (typeName initialV)))
+                     <--> plainText (maybe "" (T.pack . (++) "Parse error: ") pError)
+                     <--> (return be)
+                     <--> plainText "Push ESC to use ⊥."
+                     >>= withBoxSpacing 1 )
+
+  coll <- newCollection
+  _ <- addToCollection coll c fg
+
+  fg `onKeyPressed` \_ k _ ->
+    case k of
+      KEsc -> shutdownUi >> writeIORef isBottom True >> return True
+      KEnter -> shutdownUi >> return True
+      _ -> return False
+
+  runUi coll defaultContext
+
+  isb <- readIORef isBottom
+  if isb then return undefined
+    else do
+      res <- T.unpack `fmap` getEditText e
+      case reader res of
+        Right x -> return x
+        Left er -> do
+          edit datatype fieldName (Just $ "Failed to parse: " ++ show res ++ "\n" ++ er) initialV
